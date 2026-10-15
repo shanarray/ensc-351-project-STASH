@@ -1,0 +1,44 @@
+// hal/src/led.c
+#include "hal/led.h"
+#include "hal/gpio.h"
+
+// Define physical GPIO pin numbers mapped to your LEDs on the BeagleY-AI
+#define PIN_LED_RED    17
+#define PIN_LED_YELLOW 27
+#define PIN_LED_GREEN  22
+
+void Led_init(void) {
+    GPIO_setDirection(PIN_LED_RED, GPIO_DIRECTION_OUT);
+    GPIO_setDirection(PIN_LED_YELLOW, GPIO_DIRECTION_OUT);
+    GPIO_setDirection(PIN_LED_GREEN, GPIO_DIRECTION_OUT);
+    
+    // Start with all LEDs off
+    Led_setState(LED_RED, false);
+    Led_setState(LED_YELLOW, false);
+    Led_setState(LED_GREEN, false);
+}
+
+void Led_cleanup(void) {
+    Led_setState(LED_RED, false);
+    Led_setState(LED_YELLOW, false);
+    Led_setState(LED_GREEN, false);
+}
+
+void Led_setState(LedColor color, bool state) {
+    switch (color) {
+        case LED_RED:
+            GPIO_write(PIN_LED_RED, state);
+            break;
+        case LED_YELLOW:
+            GPIO_write(PIN_LED_YELLOW, state);
+            break;
+        case LED_GREEN:
+            GPIO_write(PIN_LED_GREEN, state);
+            break;
+    }
+}
+
+bool Led_getState(LedColor color) {
+    // Optional: Keep track of state variables or read back pin states
+    return false; 
+}
