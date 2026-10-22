@@ -205,7 +205,7 @@ void study_iteration(void)
         Led_setState(LED_YELLOW, true);
     }
     else {
-        led_setState(LED_YELLOW, false);
+        Led_setState(LED_YELLOW, false);
     }
 }
 
