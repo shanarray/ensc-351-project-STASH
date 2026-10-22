@@ -42,12 +42,12 @@ static bool read_encoder_sw(void)
     return !GPIO_read(PIN_ENC_SW);
 }
 
-static read_pause_btn(void) 
+static bool read_pause_btn(void) 
 {
     return Button_isPressed(PIN_BTN_PAUSE);
 }
 
-static read_reset_btn(void)
+static bool read_reset_btn(void)
 {
     return Button_isPressed(PIN_BTN_END);
 }
