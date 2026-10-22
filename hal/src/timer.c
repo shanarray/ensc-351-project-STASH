@@ -33,7 +33,6 @@ TimerState get_state(int *hours, int *minutes, int *seconds){
     // To update the time that shows on the LED
     if(current_state == TIMER_STUDY || current_state == TIMER_BREAK){
         if(current_time >= target_end){
-            current_state = TIMER_IDLE;
             remaining_ms = 0;
         }
         else{
@@ -145,6 +144,13 @@ void timer_idle(void){
     current_state = TIMER_IDLE;
     prev_state = TIMER_IDLE;
 
+}
+
+void timer_reset(void)
+{
+    target_end = 0;
+    remaining_time = 0;
+    current_state = TIMER_RESET;
 }
 
 
