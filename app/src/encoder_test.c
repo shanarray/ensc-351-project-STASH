@@ -1,59 +1,62 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <unistd.h>
-#include "hal/gpio.h" // Only requires the low-level GPIO library
+#include "hal/gpio.h"
+#include "hal/rotary_encoder.h"
 
-// Hardware pin definitions matching your setup
-#define PIN_ENC_A 23
-#define PIN_ENC_B 24
-
-// Volume tracking variable (Starts at 50%)
-static int audio_volume = 50;
+static int audio_volume = 50; // Tracking variable for volume (0-100%)
 
 int main(void) {
     printf("===========================================\n");
-    printf("     LCD-FREE ROTARY ENCODER TEST          \n");
+    printf("        HAL ROTARY ENCODER TEST SUITE      \n");
     printf("===========================================\n");
-    printf("Initializing GPIO pins...\n");
 
-    // Initialize only the low-level GPIO module
+    // 1. Initialize our physical layers
     GPIO_init();
-    
-    // Read the starting baseline state of Pin A
-    bool last_state_a = GPIO_read(PIN_ENC_A);
-    
+    RotaryEncoder_init();
+
     printf("Initialization successful!\n");
-    printf("Current volume baseline: %d%%\n", audio_volume);
-    printf("Spin the knob to see direction and value changes...\n\n");
+    printf("Initial volume baseline set to: %d%%\n", audio_volume);
+    printf("Spin the knob or press the shaft button to test...\n\n");
 
-    // Continuous polling loop 
+    // Baseline tracker to print volume transitions only when they change
+    int last_volume = audio_volume;
+
+    // 2. High-speed sampling loop (~200Hz to avoid missing fast steps)
     while (true) {
-        bool current_state_a = GPIO_read(PIN_ENC_A);
-
-        // Check if Pin A has transitioned (flipped from true to false or vice versa)
-        if (current_state_a != last_state_a) {
+        // Read the delta movement vector from your HAL logic
+        int8_t delta = RotaryEncoder_getDelta();
+        
+        if (delta != 0) {
+            audio_volume += (delta * 5); // Change volume by 5% per click step
             
-            // Read Pin B to determine the rotation vector
-            if (GPIO_read(PIN_ENC_B) != current_state_a) {
-                audio_volume += 5; // Step volume up by 5%
-                if (audio_volume > 100) audio_volume = 100;
-                printf("[CW  ->] Clockwise | Volume updated to: %d%%\n", audio_volume);
+            // Constrain volume tracking securely between bounds
+            if (audio_volume > 100) audio_volume = 100;
+            if (audio_volume < 0)   audio_volume = 0;
+
+            if (delta > 0) {
+                printf("[CW  ->] Clockwise | Volume updated: %d%%\n", audio_volume);
             } else {
-                audio_volume -= 5; // Step volume down by 5%
-                if (audio_volume < 0) audio_volume = 0;
-                printf("[CCW <-] Counter-Clockwise | Volume updated to: %d%%\n", audio_volume);
+                printf("[CCW <-] Counter-Clockwise | Volume updated: %d%%\n", audio_volume);
             }
         }
 
-        // Lock in the state for the next check iteration
-        last_state_a = current_state_a;
+        // Check if the built-in push button is currently engaged
+        if (RotaryEncoder_isPushButtonPressed()) {
+            printf("[BUTTON] Encoder switch is being PRESSED!\n");
+            // Simple delay loop to prevent printing a million lines per click
+            while (RotaryEncoder_isPushButtonPressed()) {
+                usleep(10000); 
+            }
+            printf("[BUTTON] Encoder switch released.\n");
+        }
 
-        // Sample every 5 milliseconds to capture fast manual spins accurately
-        usleep(5000); 
+        // Sleep for 5 milliseconds before polling again
+        usleep(5000);
     }
 
-    // Cleanup (though loop runs infinitely)
+    // Safely unwind drivers if loop breaks
+    RotaryEncoder_cleanup();
     GPIO_cleanup();
     return 0;
 }
-
