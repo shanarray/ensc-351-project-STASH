@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <unistd.h> // For usleep
 #include <stdbool.h>
-#include "timer.h"
+#include "hal/timer.h"
 
 int main(void) {
 

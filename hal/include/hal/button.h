@@ -1,13 +1,16 @@
+
 // Sample button module 
 // Part of the Hardware Abstraction Layer (HAL) 
 
-#ifndef _BUTTON_H_
-#define _BUTTON_H_
+
+#ifndef BUTTON_H
+#define BUTTON_H
 
 #include <stdbool.h>
+#include <stdint.h>
 
-void button_init(void);
-bool button_is_button_pressed(void);
-void button_cleanup(void);
+void Button_init(void);
+bool Button_isPressed(uint8_t buttonId);
+void Button_cleanup(void);
 
 #endif

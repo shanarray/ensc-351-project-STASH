@@ -1,6 +1,7 @@
 // hal/src/button.c
 #include "hal/button.h"
 #include "hal/gpio.h"
+#include <stdint.h>
 
 #define PIN_BTN_START 5
 #define PIN_BTN_PAUSE 6
@@ -18,5 +19,5 @@ void Button_cleanup(void) {
 
 bool Button_isPressed(uint8_t buttonId) {
     // Assuming active-low buttons (pressed = 0/false, released = 1/true) or adjust based on your wiring
-    return !GPIO_read(buttonId); 
+     return !GPIO_read(buttonId);
 }

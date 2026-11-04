@@ -1,11 +1,9 @@
 // Header file
-#include "timer.h"
+#include "hal/timer.h"
 #include <time.h>
 #include <stdio.h> 
 #include <unistd.h>
 
-#ifndef TIMER_H
-#define TIMER_H
 
 // Global variable for other functions to use
 static long long target_end = 0; 
@@ -153,5 +151,3 @@ void timer_reset(void)
     current_state = TIMER_RESET;
 }
 
-
-#endif 

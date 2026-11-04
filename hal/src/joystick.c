@@ -1,31 +1,49 @@
-// hal/src/joystick.c
 #include "hal/joystick.h"
-#include "hal/gpio.h"
+#include "hal/adc.h"
+#include <stdio.h>
+#include <stdbool.h>
+#include <assert.h>
 
-#define PIN_JS_UP     12
-#define PIN_JS_DOWN   16
-#define PIN_JS_LEFT   20
-#define PIN_JS_RIGHT  21
-#define PIN_JS_CENTER 26
+static bool is_initialized = false;
+
+// ADC thresholds for 12-bit range (0 - 4095, center ~ 2048)
+#define THRESHOLD_LOW  800
+#define THRESHOLD_HIGH 3200
+
+#define CH_X 0
+#define CH_Y 1
 
 void Joystick_init(void) {
-    GPIO_setDirection(PIN_JS_UP, GPIO_DIRECTION_IN);
-    GPIO_setDirection(PIN_JS_DOWN, GPIO_DIRECTION_IN);
-    GPIO_setDirection(PIN_JS_LEFT, GPIO_DIRECTION_IN);
-    GPIO_setDirection(PIN_JS_RIGHT, GPIO_DIRECTION_IN);
-    GPIO_setDirection(PIN_JS_CENTER, GPIO_DIRECTION_IN);
+    assert(!is_initialized);
+
+    Adc_init();
+
+    is_initialized = true;
 }
 
 void Joystick_cleanup(void) {
-    // Cleanup logic
+    assert(is_initialized);
+
+    Adc_cleanup();
+
+    is_initialized = false;
 }
 
 JoystickDirection Joystick_getDirection(void) {
-    if (!GPIO_read(PIN_JS_UP))    return JOYSTICK_UP;
-    if (!GPIO_read(PIN_JS_DOWN))  return JOYSTICK_DOWN;
-    if (!GPIO_read(PIN_JS_LEFT))  return JOYSTICK_LEFT;
-    if (!GPIO_read(PIN_JS_RIGHT)) return JOYSTICK_RIGHT;
-    if (!GPIO_read(PIN_JS_CENTER))return JOYSTICK_CENTER;
-    
-    return JOYSTICK_CENTER;
+    int x_val = Adc_readChannel(0);
+    int y_val = Adc_readChannel(1);
+
+   // Temporary debug print to inspect raw analog values
+   // printf("[DEBUG ADC] CH0(X): %-4d | CH1(Y): %-4d\n", x_val, y_val);
+
+if (y_val > THRESHOLD_HIGH)
+ return JOYSTICK_UP;
+if (y_val < THRESHOLD_LOW)  
+return JOYSTICK_DOWN;
+if (x_val < THRESHOLD_LOW)  
+return JOYSTICK_LEFT;
+if (x_val > THRESHOLD_HIGH) 
+return JOYSTICK_RIGHT;
+
+return JOYSTICK_CENTER;
 }

@@ -1,5 +1,5 @@
 #define _POSIX_C_SOURCE 199309L
-#include "input_handler.h"
+#include "hal/input_handler.h"
 
 #include <time.h>
 
