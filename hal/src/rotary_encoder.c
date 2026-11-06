@@ -1,40 +1,399 @@
-// hal/src/rotary_encoder.c
+
+#define _POSIX_C_SOURCE 200809L
+
+#include <stdio.h>
+#include <stdbool.h>
+#include <stdint.h>
+#include <pthread.h>
+#include <stdatomic.h>
+
+#include <gpiod.h>
+
 #include "hal/rotary_encoder.h"
-#include "hal/gpio.h"
 
-#define PIN_ENC_A 23
-#define PIN_ENC_B 24
-#define PIN_ENC_SW 25
 
-void RotaryEncoder_init(void) {
-    GPIO_setDirection(PIN_ENC_A, GPIO_DIRECTION_IN);
-    GPIO_setDirection(PIN_ENC_B, GPIO_DIRECTION_IN);
-    GPIO_setDirection(PIN_ENC_SW, GPIO_DIRECTION_IN);
+// GPIO configuration 
+#define GPIO_CHIP_PATH "/dev/gpiochip2"
+
+#define ENC_A_OFFSET  7   // GPIO16 
+#define ENC_B_OFFSET  8   // GPIO17 
+#define ENC_SW_OFFSET 13  // GPIO15 
+
+#define EVENT_BUFFER_SIZE 16
+#define POLL_TIMEOUT_NS 10000000LL
+
+
+// GPIO resources 
+static struct gpiod_chip *chip;
+static struct gpiod_line_request *request;
+static struct gpiod_edge_event_buffer *event_buffer;
+
+static pthread_t encoder_thread;
+
+
+// Thread synchronization 
+static pthread_mutex_t encoder_mutex = PTHREAD_MUTEX_INITIALIZER;
+static atomic_bool stopping = ATOMIC_VAR_INIT(false);
+
+
+// Encoder state 
+static bool initialized;
+static bool thread_started;
+
+static int pending_delta;
+static bool button_pressed;
+
+
+// Read a GPIO input. 
+static int read_gpio(unsigned int offset)
+{
+    enum gpiod_line_value value =
+        gpiod_line_request_get_value(request, offset);
+
+    if (value == GPIOD_LINE_VALUE_ERROR)
+        return -1;
+
+    return value == GPIOD_LINE_VALUE_ACTIVE ? 1 : 0;
 }
 
-void RotaryEncoder_cleanup(void) {
-    // Cleanup code
-}
 
-int8_t RotaryEncoder_getDelta(void) {
-    // Stub for quadrature decoding logic. 
-    // Returns +1 for clockwise step, -1 for counter-clockwise, 0 for no movement.
-    static bool last_a = false;
-    bool current_a = GPIO_read(PIN_ENC_A);
-    bool current_b = GPIO_read(PIN_ENC_B);
-    
-    int8_t delta = 0;
-    if (current_a != last_a) {
-        if (current_b != current_a) {
-            delta = 1;
-        } else {
-            delta = -1;
+// Encoder background thread. 
+static void *encoder_thread_func(void *arg)
+{
+    (void)arg;
+
+    while (!atomic_load(&stopping)) {
+
+        
+        // Wait for a falling edge on encoder A.
+        // The timeout also allows us to sample the button.
+        int ret = gpiod_line_request_wait_edge_events(
+            request, POLL_TIMEOUT_NS
+        );
+
+        if (ret < 0) {
+
+            if (atomic_load(&stopping))
+                break;
+
+            perror("RotaryEncoder: waiting for edge events failed");
+            break;
         }
-        last_a = current_a;
+
+        if (ret > 0) {
+
+            int num_events = gpiod_line_request_read_edge_events(
+                request, event_buffer, EVENT_BUFFER_SIZE
+            );
+
+            if (num_events < 0) {
+                perror("RotaryEncoder: reading edge events failed");
+                break;
+            }
+
+            for (int i = 0; i < num_events; i++) {
+
+                struct gpiod_edge_event *event =
+                    gpiod_edge_event_buffer_get_event(
+                        event_buffer, i
+                    );
+
+                if (event == NULL)
+                    continue;
+
+                if (gpiod_edge_event_get_line_offset(event)
+                    == ENC_A_OFFSET) {
+
+                    int value_b = read_gpio(ENC_B_OFFSET);
+
+                    if (value_b < 0) {
+                        perror("RotaryEncoder: reading encoder B failed");
+                        continue;
+                    }
+
+
+                    // Determine rotation direction.
+                    // Reverse the signs if the physical direction
+                    // is opposite to the desired direction.
+                    int delta = value_b ? 1 : -1;
+
+                    pthread_mutex_lock(&encoder_mutex);
+
+                    pending_delta += delta;
+
+                    if (pending_delta > 1000)
+                        pending_delta = 1000;
+
+                    if (pending_delta < -1000)
+                        pending_delta = -1000;
+
+                    pthread_mutex_unlock(&encoder_mutex);
+                }
+            }
+        }
+
+        
+        // Sample the push button.
+        // Assumes the switch pulls SW low when pressed.
+         
+        int sw = read_gpio(ENC_SW_OFFSET);
+
+        if (sw >= 0) {
+
+            pthread_mutex_lock(&encoder_mutex);
+
+            button_pressed = (sw == 0);
+
+            pthread_mutex_unlock(&encoder_mutex);
+        }
     }
-    return delta;
+
+    return NULL;
 }
 
-bool RotaryEncoder_isPushButtonPressed(void) {
-    return !GPIO_read(PIN_ENC_SW);
+
+// Initialize rotary encoder GPIO. 
+bool rotary_encoder_init(void)
+{
+    if (initialized)
+        return true;
+
+    atomic_store(&stopping, false);
+
+    chip = gpiod_chip_open(GPIO_CHIP_PATH);
+
+    if (chip == NULL) {
+        perror("RotaryEncoder: opening GPIO chip failed");
+        goto fail;
+    }
+
+    struct gpiod_line_settings *settings_a =
+        gpiod_line_settings_new();
+
+    struct gpiod_line_settings *settings_b =
+        gpiod_line_settings_new();
+
+    struct gpiod_line_settings *settings_sw =
+        gpiod_line_settings_new();
+
+    struct gpiod_line_config *line_config =
+        gpiod_line_config_new();
+
+    struct gpiod_request_config *request_config =
+        gpiod_request_config_new();
+
+    if (settings_a == NULL ||
+        settings_b == NULL ||
+        settings_sw == NULL ||
+        line_config == NULL ||
+        request_config == NULL) {
+
+        fprintf(stderr,
+                "RotaryEncoder: allocating GPIO configuration failed\n");
+
+        goto fail_config;
+    }
+
+    // Encoder A: input with falling-edge detection. 
+    if (gpiod_line_settings_set_direction(
+            settings_a, GPIOD_LINE_DIRECTION_INPUT) < 0 ||
+        gpiod_line_settings_set_edge_detection(
+            settings_a, GPIOD_LINE_EDGE_FALLING) < 0) {
+
+        perror("RotaryEncoder: configuring encoder A failed");
+        goto fail_config;
+    }
+
+    // Encoder B: standard input. 
+    if (gpiod_line_settings_set_direction(
+            settings_b, GPIOD_LINE_DIRECTION_INPUT) < 0) {
+
+        perror("RotaryEncoder: configuring encoder B failed");
+        goto fail_config;
+    }
+
+    // Encoder button: standard input. 
+    if (gpiod_line_settings_set_direction(
+            settings_sw, GPIOD_LINE_DIRECTION_INPUT) < 0) {
+
+        perror("RotaryEncoder: configuring button failed");
+        goto fail_config;
+    }
+
+    unsigned int offset_a = ENC_A_OFFSET;
+    unsigned int offset_b = ENC_B_OFFSET;
+    unsigned int offset_sw = ENC_SW_OFFSET;
+
+    if (gpiod_line_config_add_line_settings(
+            line_config, &offset_a, 1, settings_a) < 0 ||
+        gpiod_line_config_add_line_settings(
+            line_config, &offset_b, 1, settings_b) < 0 ||
+        gpiod_line_config_add_line_settings(
+            line_config, &offset_sw, 1, settings_sw) < 0) {
+
+        perror("RotaryEncoder: adding GPIO line settings failed");
+        goto fail_config;
+    }
+
+    gpiod_request_config_set_consumer(
+        request_config, "study_timer_encoder"
+    );
+
+    request = gpiod_chip_request_lines(
+        chip, request_config, line_config
+    );
+
+    if (request == NULL) {
+        perror("RotaryEncoder: requesting GPIO lines failed");
+        goto fail_config;
+    }
+
+    event_buffer = gpiod_edge_event_buffer_new(
+        EVENT_BUFFER_SIZE
+    );
+
+    if (event_buffer == NULL) {
+        perror("RotaryEncoder: creating event buffer failed");
+        goto fail_config;
+    }
+
+    // Release temporary configuration objects.
+    gpiod_line_settings_free(settings_a);
+    gpiod_line_settings_free(settings_b);
+    gpiod_line_settings_free(settings_sw);
+    gpiod_line_config_free(line_config);
+    gpiod_request_config_free(request_config);
+
+    pthread_mutex_lock(&encoder_mutex);
+
+    pending_delta = 0;
+    button_pressed = false;
+
+    pthread_mutex_unlock(&encoder_mutex);
+
+    int result = pthread_create(
+        &encoder_thread,
+        NULL,
+        encoder_thread_func,
+        NULL
+    );
+
+    if (result != 0) {
+
+        fprintf(stderr,
+                "RotaryEncoder: pthread_create failed: %d\n",
+                result);
+
+        goto fail;
+    }
+
+    thread_started = true;
+    initialized = true;
+
+    return true;
+
+
+fail_config:
+
+    if (settings_a != NULL)
+        gpiod_line_settings_free(settings_a);
+
+    if (settings_b != NULL)
+        gpiod_line_settings_free(settings_b);
+
+    if (settings_sw != NULL)
+        gpiod_line_settings_free(settings_sw);
+
+    if (line_config != NULL)
+        gpiod_line_config_free(line_config);
+
+    if (request_config != NULL)
+        gpiod_request_config_free(request_config);
+
+
+fail:
+
+    if (event_buffer != NULL) {
+        gpiod_edge_event_buffer_free(event_buffer);
+        event_buffer = NULL;
+    }
+
+    if (request != NULL) {
+        gpiod_line_request_release(request);
+        request = NULL;
+    }
+
+    if (chip != NULL) {
+        gpiod_chip_close(chip);
+        chip = NULL;
+    }
+
+    return false;
 }
+
+
+// Get accumulated encoder rotation. 
+int8_t rotary_encoder_get_delta(void)
+{
+    pthread_mutex_lock(&encoder_mutex);
+
+    int delta = pending_delta;
+    pending_delta = 0;
+
+    pthread_mutex_unlock(&encoder_mutex);
+
+    if (delta > 127)
+        delta = 127;
+
+    if (delta < -127)
+        delta = -127;
+
+    return (int8_t)delta;
+}
+
+
+// Check whether the encoder button is pressed. 
+bool rotary_encoder_is_button_pressed(void)
+{
+    pthread_mutex_lock(&encoder_mutex);
+
+    bool pressed = button_pressed;
+
+    pthread_mutex_unlock(&encoder_mutex);
+
+    return pressed;
+}
+
+
+// Stop the encoder thread and release GPIO resources. 
+void rotary_encoder_cleanup(void)
+{
+    if (!initialized)
+        return;
+
+    atomic_store(&stopping, true);
+
+    if (thread_started) {
+        pthread_join(encoder_thread, NULL);
+        thread_started = false;
+    }
+
+    if (event_buffer != NULL) {
+        gpiod_edge_event_buffer_free(event_buffer);
+        event_buffer = NULL;
+    }
+
+    if (request != NULL) {
+        gpiod_line_request_release(request);
+        request = NULL;
+    }
+
+    if (chip != NULL) {
+        gpiod_chip_close(chip);
+        chip = NULL;
+    }
+
+    initialized = false;
+}
+
+
