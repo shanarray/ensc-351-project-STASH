@@ -1,0 +1,26 @@
+Buzzer handoff — GPIO13 (BeagleY-AI physical pin 33)
+
+Production files to copy into Shannah’s project:
+  hal/include/hal/buzzer_gpio.h
+  hal/src/buzzer_gpio.c
+
+Uses libgpiod 2.x C API, linked against libgpiod.so.3.
+Do not install an imagined libgpiod version 3; .so.3 is the library ABI name.
+
+Use existing feedback.c/feedback_system.c from the earlier LED handoff.
+In main: Buzzer_init(); FeedbackSystem_init(Buzzer_write);
+Each loop: input_handler_update(); FeedbackSystem_update();
+On exit: FeedbackSystem_cleanup(); Buzzer_cleanup();
+Add hal/src/buzzer_gpio.c to the build and link gpiod.
+Do not call timer_update() separately if FeedbackSystem_update() already does.
+
+GPIO reservations from team: buttons GPIO22-25, LEDs GPIO14,15,18, buzzer GPIO13.
+
+Tests on a machine with libgpiod 2.x development headers:
+  sh tests/test_beep.sh
+  sh tests/test_timer_beep.sh
+Tests/fixtures are standalone copies for testing; DO NOT copy them into the project.
+
+Original BeagleY-AI used libgpiod 1.x headers for successful physical buzzer
+tests. Those tests confirmed the circuit and timer-triggered sound, but
+this newer API driver still needs testing on the team's target environment.
