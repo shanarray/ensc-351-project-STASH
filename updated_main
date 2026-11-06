@@ -1,0 +1,103 @@
+
+#define _DEFAULT_SOURCE
+#define _XOPEN_SOURCE 500
+
+#include <signal.h>
+#include <stdio.h>
+#include <unistd.h>
+
+#include "feedback_system.h"
+#include "buzzer_gpio.h"
+#include "gpio_buttons.h"
+#include "input_handler.h"
+#include "timer.h"
+
+static volatile sig_atomic_t running = 1;
+
+static void on_sigint(int signal_number)
+{
+    (void)signal_number;
+    running = 0;
+}
+
+static const char *state_name(TimerState state)
+{
+    switch (state) {
+    case TIMER_IDLE:   return "IDLE";
+    case TIMER_STUDY:  return "STUDY";
+    case TIMER_BREAK:  return "BREAK";
+    case TIMER_PAUSED: return "PAUSED";
+    case TIMER_RESET:  return "RESET";
+    default:          return "?";
+    }
+}
+
+int main(void)
+{
+    signal(SIGINT, on_sigint);
+
+    // Initialize the physical buzzer.
+    if (Buzzer_init() != 0) {
+        fprintf(stderr, "Failed to initialize buzzer\n");
+        return 1;
+    }
+
+    // Initialize LEDs and connect the buzzer callback.
+    FeedbackSystem_init(Buzzer_write);
+
+    // Initialize the four physical buttons.
+    if (gpio_buttons_init() != 0) {
+        fprintf(stderr, "Failed to initialize buttons\n");
+        FeedbackSystem_cleanup();
+        Buzzer_cleanup();
+        return 1;
+    }
+
+    printf("STASH Study Timer\n");
+    printf("Buttons: GPIO24=STUDY, GPIO25=BREAK, ");
+    printf("GPIO22=PAUSE/RESUME, GPIO23=RESET\n");
+    printf("LEDs: GPIO14, GPIO15, GPIO18\n");
+    printf("Buzzer: GPIO13\n");
+    printf("Ctrl+C to quit.\n");
+
+    TimerState prev_state = (TimerState)-1;
+    int prev_h = -1;
+    int prev_m = -1;
+    int prev_s = -1;
+
+    while (running) {
+        // Read buttons and handle timer events.
+        input_handler_update();
+
+        // Update timer, LEDs, and buzzer.
+        FeedbackSystem_update();
+
+        int h, m, s;
+        TimerState state = get_state(&h, &m, &s);
+
+        if (state != prev_state ||
+            h != prev_h ||
+            m != prev_m ||
+            s != prev_s) {
+
+            printf("%-6s %02d:%02d:%02d\n",
+                   state_name(state), h, m, s);
+            fflush(stdout);
+
+            prev_state = state;
+            prev_h = h;
+            prev_m = m;
+            prev_s = s;
+        }
+
+        usleep(10000);
+    }
+
+    // Release hardware resources.
+    gpio_buttons_cleanup();
+    FeedbackSystem_cleanup();
+    Buzzer_cleanup();
+
+    printf("Done.\n");
+    return 0;
+}
