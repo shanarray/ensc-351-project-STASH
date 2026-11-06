@@ -1,13 +1,14 @@
 // hal/include/hal/rotary_encoder.h
-#ifndef ROTARY_ENCODER_H
-#define ROTARY_ENCODER_H
+#ifndef _ROTARY_ENCODER_H
+#define _ROTARY_ENCODER_H
 
 #include <stdbool.h>
 #include <stdint.h>
 
-void RotaryEncoder_init(void);
-void RotaryEncoder_cleanup(void);
-int8_t RotaryEncoder_getDelta(void);
-bool RotaryEncoder_isPushButtonPressed(void);
+bool rotary_encoder_init(void);
+int8_t rotary_encoder_get_delta(void);
+bool rotary_encoder_is_button_pressed(void);
+void rotary_encoder_cleanup(void);
+
 
 #endif
