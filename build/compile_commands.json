@@ -1,0 +1,17 @@
+[
+{
+  "directory": "/home/harkirit/ensc351/work/motion_sensor/build/hal",
+  "command": "/usr/bin/aarch64-linux-gnu-gcc  -I/home/harkirit/ensc351/sysroot -I/home/harkirit/ensc351/work/motion_sensor/hal/hal/include -I/home/harkirit/ensc351/work/motion_sensor/hal/include -g -Wall -Werror -Wpedantic -Wextra -fdiagnostics-color -fsanitize=address -pthread -std=gnu11 -o CMakeFiles/hal.dir/src/buzzer_gpio.c.o -c /home/harkirit/ensc351/work/motion_sensor/hal/src/buzzer_gpio.c",
+  "file": "/home/harkirit/ensc351/work/motion_sensor/hal/src/buzzer_gpio.c"
+},
+{
+  "directory": "/home/harkirit/ensc351/work/motion_sensor/build/hal",
+  "command": "/usr/bin/aarch64-linux-gnu-gcc  -I/home/harkirit/ensc351/sysroot -I/home/harkirit/ensc351/work/motion_sensor/hal/hal/include -I/home/harkirit/ensc351/work/motion_sensor/hal/include -g -Wall -Werror -Wpedantic -Wextra -fdiagnostics-color -fsanitize=address -pthread -std=gnu11 -o CMakeFiles/hal.dir/src/motion_sensor.c.o -c /home/harkirit/ensc351/work/motion_sensor/hal/src/motion_sensor.c",
+  "file": "/home/harkirit/ensc351/work/motion_sensor/hal/src/motion_sensor.c"
+},
+{
+  "directory": "/home/harkirit/ensc351/work/motion_sensor/build/app",
+  "command": "/usr/bin/aarch64-linux-gnu-gcc  -I/home/harkirit/ensc351/work/motion_sensor/app/include -I/home/harkirit/ensc351/work/motion_sensor/hal/include -g -Wall -Werror -Wpedantic -Wextra -fdiagnostics-color -fsanitize=address -pthread -std=gnu11 -o CMakeFiles/motion.dir/src/main.c.o -c /home/harkirit/ensc351/work/motion_sensor/app/src/main.c",
+  "file": "/home/harkirit/ensc351/work/motion_sensor/app/src/main.c"
+}
+]

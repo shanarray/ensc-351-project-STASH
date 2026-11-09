@@ -1,0 +1,1 @@
+/usr/bin/aarch64-linux-gnu-gcc -g -fsanitize=address -pthread CMakeFiles/study_session.dir/src/main.c.o -o study_session  -Wl,-rpath,/home/harkirit/ensc351/sysroot ../hal/libhal.a /home/harkirit/ensc351/sysroot/libgpiod.so 
