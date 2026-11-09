@@ -13,7 +13,7 @@ int Buzzer_init(void)
         snprintf(path, sizeof(path), "/dev/gpiochip%d", i);
         struct gpiod_chip *chip = gpiod_chip_open(path);
         if (!chip) continue;
-        int line = gpiod_chip_get_line_offset_from_name(chip, "GPIO13");
+        int line = gpiod_chip_get_line_offset_from_name(chip, "GPIO12");
         if (line >= 0) {
             offset = (unsigned int)line;
             struct gpiod_line_settings *settings = gpiod_line_settings_new();
@@ -31,15 +31,15 @@ int Buzzer_init(void)
             if (settings) gpiod_line_settings_free(settings);
             gpiod_chip_close(chip);
             if (request) {
-                puts("Buzzer ready: GPIO13 (physical pin 33)");
+                puts("Buzzer ready: GPIO12");
                 return 0;
             }
-            fputs("GPIO13 is unavailable (in use, permissions, or pin mux).\n", stderr);
+            fputs("GPIO12 is unavailable (in use, permissions, or pin mux).\n", stderr);
             return -1;
         }
         gpiod_chip_close(chip);
     }
-    fputs("GPIO13 not found; check gpioinfo and pin mux.\n", stderr);
+    fputs("GPIO7 not found; check gpioinfo and pin mux.\n", stderr);
     return -1;
 }
 

@@ -1,8 +1,0 @@
-/home/harkirit/ensc351/work/motion_sensor/build/CMakeFiles/edit_cache.dir
-/home/harkirit/ensc351/work/motion_sensor/build/CMakeFiles/rebuild_cache.dir
-/home/harkirit/ensc351/work/motion_sensor/build/hal/CMakeFiles/hal.dir
-/home/harkirit/ensc351/work/motion_sensor/build/hal/CMakeFiles/edit_cache.dir
-/home/harkirit/ensc351/work/motion_sensor/build/hal/CMakeFiles/rebuild_cache.dir
-/home/harkirit/ensc351/work/motion_sensor/build/app/CMakeFiles/motion.dir
-/home/harkirit/ensc351/work/motion_sensor/build/app/CMakeFiles/edit_cache.dir
-/home/harkirit/ensc351/work/motion_sensor/build/app/CMakeFiles/rebuild_cache.dir

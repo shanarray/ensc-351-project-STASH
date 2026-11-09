@@ -1,2 +1,0 @@
-/usr/bin/aarch64-linux-gnu-ar qc libhal.a CMakeFiles/hal.dir/src/buzzer_gpio.c.o CMakeFiles/hal.dir/src/motion_sensor.c.o
-/usr/bin/aarch64-linux-gnu-ranlib libhal.a
