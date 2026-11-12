@@ -13,6 +13,7 @@
 
 
 // GPIO configuration 
+#define GPIO_CHIP_PATH "/dev/gpiochip1"
 #define GPIO_CHIP_PATH "/dev/gpiochip2"
 
 #define ENC_A_OFFSET  41  // GPIO22
@@ -24,8 +25,10 @@
 
 
 // GPIO resources 
-static struct gpiod_chip *chip;
-static struct gpiod_line_request *request;
+static struct gpiod_chip *chip1;
+static struct gpiod_chip *chip2;
+static struct gpiod_line_request *request_a;
+static struct gpiod_line_request *request_b_sw;
 static struct gpiod_edge_event_buffer *event_buffer;
 
 static pthread_t encoder_thread;
@@ -45,10 +48,10 @@ static bool button_pressed;
 
 
 // Read a GPIO input. 
-static int read_gpio(unsigned int offset)
+static int read_gpio(struct gpiod_line_request *gpio_request, unsigned int offset)
 {
     enum gpiod_line_value value =
-        gpiod_line_request_get_value(request, offset);
+        gpiod_line_request_get_value(gpio_request, offset);
 
     if (value == GPIOD_LINE_VALUE_ERROR)
         return -1;
@@ -83,7 +86,7 @@ static void *encoder_thread_func(void *arg)
         if (ret > 0) {
 
             int num_events = gpiod_line_request_read_edge_events(
-                request, event_buffer, EVENT_BUFFER_SIZE
+                request_a, event_buffer, EVENT_BUFFER_SIZE
             );
 
             if (num_events < 0) {
@@ -104,7 +107,7 @@ static void *encoder_thread_func(void *arg)
                 if (gpiod_edge_event_get_line_offset(event)
                     == ENC_A_OFFSET) {
 
-                    int value_b = read_gpio(ENC_B_OFFSET);
+                    int value_b = read_gpio(request_b_sw, ENC_B_OFFSET);
 
                     if (value_b < 0) {
                         perror("RotaryEncoder: reading encoder B failed");
@@ -136,7 +139,7 @@ static void *encoder_thread_func(void *arg)
         // Sample the push button.
         // Assumes the switch pulls SW low when pressed.
          
-        int sw = read_gpio(ENC_SW_OFFSET);
+        int sw = read_gpio(request_b_sw, ENC_SW_OFFSET);
 
         if (sw >= 0) {
 
@@ -159,39 +162,53 @@ bool rotary_encoder_init(void)
         return true;
 
     atomic_store(&stopping, false);
+    struct gpiod_line_settings *settings_a = NULL;
+    struct gpiod_line_settings *settings_b = NULL;
+    struct gpiod_line_settings *settings_sw = NULL;
 
-    chip = gpiod_chip_open(GPIO_CHIP_PATH);
+    struct gpiod_line_config *config_a = NULL;
+    struct gpiod_line_config *config_b_sw = NULL;
 
-    if (chip == NULL) {
-        perror("RotaryEncoder: opening GPIO chip failed");
+    struct gpiod_request_config *request_config_a = NULL;
+    struct gpiod_request_config *request_config_b_sw = NULL;
+
+    chip1 = gpiod_chip_open(GPIO_CHIP1_PATH);
+
+    if (chip1 == NULL) {
+        perror("RotaryEncoder: opening gpiochip1 failed");
         goto fail;
     }
 
-    struct gpiod_line_settings *settings_a =
-        gpiod_line_settings_new();
+    chip2 = gpiod_chip_open(GPIO_CHIP2_PATH);
 
-    struct gpiod_line_settings *settings_b =
-        gpiod_line_settings_new();
+    if (chip2 == NULL) {
+        perror("RotaryEncoder: opening gpiochip2 failed");
+        goto fail;
+    }
 
-    struct gpiod_line_settings *settings_sw =
-        gpiod_line_settings_new();
+    // Allocate configuration objects
+    settings_a = gpiod_line_settings_new();
+    settings_b = gpiod_line_settings_new();
+    settings_sw = gpiod_line_settings_new();
 
-    struct gpiod_line_config *line_config =
-        gpiod_line_config_new();
+    config_a = gpiod_line_config_new();
+    config_b_sw = gpiod_line_config_new();
 
-    struct gpiod_request_config *request_config =
-        gpiod_request_config_new();
+    request_config_a = gpiod_request_config_new();
+    request_config_b_sw = gpiod_request_config_new();
 
     if (settings_a == NULL ||
         settings_b == NULL ||
         settings_sw == NULL ||
-        line_config == NULL ||
-        request_config == NULL) {
+        config_a == NULL ||
+        config_b_sw == NULL ||
+        request_config_a == NULL ||
+        request_config_b_sw == NULL) {
 
         fprintf(stderr,
                 "RotaryEncoder: allocating GPIO configuration failed\n");
 
-        goto fail_config;
+        goto fail;
     }
 
     // Encoder A: input with falling-edge detection. 
@@ -201,7 +218,7 @@ bool rotary_encoder_init(void)
             settings_a, GPIOD_LINE_EDGE_FALLING) < 0) {
 
         perror("RotaryEncoder: configuring encoder A failed");
-        goto fail_config;
+        goto fail;
     }
 
     // Encoder B: standard input. 
@@ -209,7 +226,7 @@ bool rotary_encoder_init(void)
             settings_b, GPIOD_LINE_DIRECTION_INPUT) < 0) {
 
         perror("RotaryEncoder: configuring encoder B failed");
-        goto fail_config;
+        goto fail;
     }
 
     // Encoder button: standard input. 
@@ -217,40 +234,48 @@ bool rotary_encoder_init(void)
             settings_sw, GPIOD_LINE_DIRECTION_INPUT) < 0) {
 
         perror("RotaryEncoder: configuring button failed");
-        goto fail_config;
+        goto fail;
     }
 
+    // GPIO 22
     unsigned int offset_a = ENC_A_OFFSET;
+    if (gpiod_line_config_add_line_settings(config_a, &offset_a, 1, settings_a) < 0) {
+        perror("RotaryEncoder adding encoder A settings failed");
+        goto fail;
+    }
+
+    // Configure GPIO 15 and 17
     unsigned int offset_b = ENC_B_OFFSET;
     unsigned int offset_sw = ENC_SW_OFFSET;
-
     if (gpiod_line_config_add_line_settings(
-            line_config, &offset_a, 1, settings_a) < 0 ||
+        config_b_sw, &offset_b, 1, settings_b) < 0 ||
         gpiod_line_config_add_line_settings(
-            line_config, &offset_b, 1, settings_b) < 0 ||
-        gpiod_line_config_add_line_settings(
-            line_config, &offset_sw, 1, settings_sw) < 0) {
+        config_b_sw, &offset_sw, 1, settings_sw) < 0) {
 
-        perror("RotaryEncoder: adding GPIO line settings failed");
-        goto fail_config;
+        perror("RotaryEncoder: adding GPIO15 and 17 settings failed");
+        goto fail;
     }
 
-    gpiod_request_config_set_consumer(
-        request_config, "study_timer_encoder"
-    );
+    gpiod_request_config_set_consumer(request_config_a, "study_timer_encoder_a");
+    gpiod_request_config_set_consumer(request_config_b_sw, "study_timer_encoder_b_sw");
 
-    request = gpiod_chip_request_lines(
-        chip, request_config, line_config
-    );
+    // Request GPIO22 from gpiochip1
+    request_a = gpiod_chip_request_lines(chip1, request_config_a, config_a);
 
-    if (request == NULL) {
-        perror("RotaryEncoder: requesting GPIO lines failed");
-        goto fail_config;
+    if (request_a == NULL) {
+        perror("RotaryEncoder: requesting GPIO22 lines failed");
+        goto fail;
     }
 
-    event_buffer = gpiod_edge_event_buffer_new(
-        EVENT_BUFFER_SIZE
-    );
+    // Request GPIO15 and 17 from gpiochip2
+    request_b_sw = gpiod_chip_request_lines(chip2, request_config_b_sw, config_b_sw );
+
+    if (request_b_sw == NULL) {
+        perror("RotaryEncoder: requesting GPIO15 and 17 lines failed");
+        goto fail;
+    }
+
+    event_buffer = gpiod_edge_event_buffer_new(EVENT_BUFFER_SIZE);
 
     if (event_buffer == NULL) {
         perror("RotaryEncoder: creating event buffer failed");
@@ -261,8 +286,13 @@ bool rotary_encoder_init(void)
     gpiod_line_settings_free(settings_a);
     gpiod_line_settings_free(settings_b);
     gpiod_line_settings_free(settings_sw);
-    gpiod_line_config_free(line_config);
-    gpiod_request_config_free(request_config);
+    
+    gpiod_line_config_free(config_a);
+    gpiod_line_config_free(config_b_sw);
+
+    gpiod_request_config_free(request_config_a);
+    gpiod_request_config_free(request_config_b_sw);
+
 
     pthread_mutex_lock(&encoder_mutex);
 
@@ -293,7 +323,7 @@ bool rotary_encoder_init(void)
     return true;
 
 
-fail_config:
+fail:
 
     if (settings_a != NULL)
         gpiod_line_settings_free(settings_a);
@@ -304,30 +334,43 @@ fail_config:
     if (settings_sw != NULL)
         gpiod_line_settings_free(settings_sw);
 
-    if (line_config != NULL)
-        gpiod_line_config_free(line_config);
+    if (config_a != NULL)
+        gpiod_line_config_free(config_a);
+    
+    if (config_b_sw != NULL)
+        gpiod_line_config_free(config_b_sw);
 
-    if (request_config != NULL)
-        gpiod_request_config_free(request_config);
+    if (request_config_a != NULL)
+        gpiod_request_config_free(request_config_a);
 
-
-fail:
+    if (request_config_b_sw != NULL)
+        gpiod_request_config_free(request_config_b_sw);
 
     if (event_buffer != NULL) {
         gpiod_edge_event_buffer_free(event_buffer);
         event_buffer = NULL;
     }
 
-    if (request != NULL) {
-        gpiod_line_request_release(request);
-        request = NULL;
+    if (request_a != NULL) {
+        gpiod_line_request_release(request_a);
+        request_a = NULL;
     }
 
-    if (chip != NULL) {
-        gpiod_chip_close(chip);
-        chip = NULL;
+    if (request_b_sw != NULL) {
+        gpiod_line_request_release(request_b_sw);
+        request_b_sw = NULL;
     }
 
+    if (chip1 != NULL) {
+        gpiod_chip_close(chip1);
+        chip1 = NULL;
+    }
+    
+    if (chip2 != NULL) {
+        gpiod_chip_close(chip2);
+        chip2 = NULL;
+    }
+    
     return false;
 }
 
@@ -383,14 +426,25 @@ void rotary_encoder_cleanup(void)
         event_buffer = NULL;
     }
 
-    if (request != NULL) {
-        gpiod_line_request_release(request);
-        request = NULL;
+    if (request_a != NULL) {
+        gpiod_line_request_release(request_a);
+        request_a = NULL;
     }
 
-    if (chip != NULL) {
-        gpiod_chip_close(chip);
-        chip = NULL;
+    
+    if (request_b_sw != NULL) {
+        gpiod_line_request_release(request_b_sw);
+        request_b_sw = NULL;
+    }
+
+    if (chip1 != NULL) {
+        gpiod_chip_close(chip1);
+        chip1 = NULL;
+    }
+
+    if (chip2 != NULL) {
+        gpiod_chip_close(chip2);
+        chip2 = NULL;
     }
 
     initialized = false;
