@@ -13,8 +13,8 @@
 
 
 // GPIO configuration 
-#define GPIO_CHIP_PATH "/dev/gpiochip1"
-#define GPIO_CHIP_PATH "/dev/gpiochip2"
+#define GPIO_CHIP1_PATH "/dev/gpiochip1"
+#define GPIO_CHIP2_PATH "/dev/gpiochip2"
 
 #define ENC_A_OFFSET  41  // GPIO22
 #define ENC_B_OFFSET  8   // GPIO17 
@@ -70,11 +70,11 @@ static void *encoder_thread_func(void *arg)
         
         // Wait for a falling edge on encoder A.
         // The timeout also allows us to sample the button.
-        int ret = gpiod_line_request_wait_edge_events(
+        int rec = gpiod_line_request_wait_edge_events(
             request, POLL_TIMEOUT_NS
         );
 
-        if (ret < 0) {
+        if (rec < 0) {
 
             if (atomic_load(&stopping))
                 break;
@@ -83,7 +83,7 @@ static void *encoder_thread_func(void *arg)
             break;
         }
 
-        if (ret > 0) {
+        if (rec > 0) {
 
             int num_events = gpiod_line_request_read_edge_events(
                 request_a, event_buffer, EVENT_BUFFER_SIZE
@@ -104,8 +104,7 @@ static void *encoder_thread_func(void *arg)
                 if (event == NULL)
                     continue;
 
-                if (gpiod_edge_event_get_line_offset(event)
-                    == ENC_A_OFFSET) {
+                if (gpiod_edge_event_get_line_offset(event) == ENC_A_OFFSET) {
 
                     int value_b = read_gpio(request_b_sw, ENC_B_OFFSET);
 
@@ -115,9 +114,8 @@ static void *encoder_thread_func(void *arg)
                     }
 
 
-                    // Determine rotation direction.
-                    // Reverse the signs if the physical direction
-                    // is opposite to the desired direction.
+                    // Determine rotation direction
+                    
                     int delta = value_b ? 1 : -1;
 
                     pthread_mutex_lock(&encoder_mutex);
@@ -136,8 +134,8 @@ static void *encoder_thread_func(void *arg)
         }
 
         
-        // Sample the push button.
-        // Assumes the switch pulls SW low when pressed.
+        // Sample the push button
+        // Assumes the switch pulls SW low when pressed
          
         int sw = read_gpio(request_b_sw, ENC_SW_OFFSET);
 
