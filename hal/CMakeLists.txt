@@ -10,8 +10,8 @@ add_library(hal STATIC ${MY_SOURCES})
 target_include_directories(hal PUBLIC include)
 
 # added for gpio
-target_include_directories(hal BEFORE PRIVATE "$ENV{HOME}/ensc351/sysroot")
-target_link_libraries(hal PRIVATE "$ENV{HOME}/ensc351/sysroot/libgpiod.so")
+# added for gpio
+target_link_libraries(hal PRIVATE gpiod)
 
 
 
