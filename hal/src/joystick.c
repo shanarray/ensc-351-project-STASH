@@ -30,20 +30,13 @@ void Joystick_cleanup(void) {
 }
 
 JoystickDirection Joystick_getDirection(void) {
-    int x_val = Adc_readChannel(0);
-    int y_val = Adc_readChannel(1);
+    int y_val = Adc_readChannel(0);
 
-   // Temporary debug print to inspect raw analog values
-   // printf("[DEBUG ADC] CH0(X): %-4d | CH1(Y): %-4d\n", x_val, y_val);
+    if (y_val > THRESHOLD_HIGH)
+        return JOYSTICK_UP;
 
-if (y_val > THRESHOLD_HIGH)
- return JOYSTICK_UP;
-if (y_val < THRESHOLD_LOW)  
-return JOYSTICK_DOWN;
-if (x_val < THRESHOLD_LOW)  
-return JOYSTICK_LEFT;
-if (x_val > THRESHOLD_HIGH) 
-return JOYSTICK_RIGHT;
+    if (y_val < THRESHOLD_LOW)
+        return JOYSTICK_DOWN;
 
-return JOYSTICK_CENTER;
+    return JOYSTICK_CENTER;
 }
