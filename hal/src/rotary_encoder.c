@@ -15,7 +15,7 @@
 // GPIO configuration 
 #define GPIO_CHIP_PATH "/dev/gpiochip2"
 
-#define ENC_A_OFFSET  7   // GPIO16 
+#define ENC_A_OFFSET  41  // GPIO22
 #define ENC_B_OFFSET  8   // GPIO17 
 #define ENC_SW_OFFSET 13  // GPIO15 
 
