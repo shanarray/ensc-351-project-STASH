@@ -1,4 +1,4 @@
-#include "hal/buzzer_gpio.h"
+#include "hal/motion_buzzer.h"
 #include <gpiod.h>
 #include <stdio.h>
 #include <time.h>
@@ -6,7 +6,7 @@
 static struct gpiod_line_request *request;
 static unsigned int offset;
 
-int Buzzer_init(void)
+int MotionBuzzer_init(void)
 {
     for (int i = 0; i < 10; i++) {
         char path[32];
@@ -43,7 +43,7 @@ int Buzzer_init(void)
     return -1;
 }
 
-void Buzzer_write(bool on)
+void MotionBuzzer_write(bool on)
 {
    /* if (request && gpiod_line_request_set_value(request, offset,
         on ? GPIOD_LINE_VALUE_ACTIVE : GPIOD_LINE_VALUE_INACTIVE) != 0)
@@ -59,7 +59,7 @@ void Buzzer_write(bool on)
 }
 
 // Generate a tone for a passive buzzer
-void Buzzer_beep(int frequency, int duration_ms)
+void MotionBuzzer_beep(int frequency, int duration_ms)
 {
     if (!request || frequency <= 0 || duration_ms <= 0) 
         return;
@@ -74,23 +74,23 @@ void Buzzer_beep(int frequency, int duration_ms)
 
     for (int i = 0; i < cycles; i++) {
         // PNP ON, GPIO LOW
-        Buzzer_write(true);
+        MotionBuzzer_write(true);
 
         nanosleep(&delay, NULL);
 
         // PNP OFF, GPIO HIGH
-        Buzzer_write(false);
+        MotionBuzzer_write(false);
 
         nanosleep(&delay, NULL);
     }
     // Buzzer off
-    Buzzer_write(false);
+    MotionBuzzer_write(false);
 }
 
-void Buzzer_cleanup(void)
+void MotionBuzzer_cleanup(void)
 {
     if (request) {
-        Buzzer_write(false);
+        MotionBuzzer_write(false);
         gpiod_line_request_release(request);
         request = NULL;
     }

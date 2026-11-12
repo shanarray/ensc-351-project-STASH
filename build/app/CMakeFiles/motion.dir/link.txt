@@ -1,0 +1,1 @@
+/usr/bin/aarch64-linux-gnu-gcc -fsanitize=address -pthread CMakeFiles/motion.dir/src/main.c.o -o motion  -Wl,-rpath,/home/harkirit/ensc351/sysroot ../hal/libhal.a /home/harkirit/ensc351/sysroot/libgpiod.so 

@@ -2,7 +2,7 @@
 #include <unistd.h>
 
 #include "hal/motion_sensor.h"
-#include "hal/buzzer_gpio.h"
+#include "hal/motion_buzzer.h"
 
 #define CHECK_INTERVAL_MS 100
 #define LEAVE_DELAY_SEC 30
@@ -16,7 +16,7 @@ int main()
         return 1;
     }
 
-    if (Buzzer_init() != 0) {
+    if (MotionBuzzer_init() != 0) {
         MotionSensor_cleanup();
         return 1;
     }
@@ -44,7 +44,7 @@ int main()
                 printf("No motion for %d seconds. Sounding buzzer!\n", LEAVE_DELAY_SEC);
 
                 for (int i = 0; i < 3; i++) {
-                    Buzzer_beep(2000, 250);
+                    MotionBuzzer_beep(2000, 250);
                     usleep(100000);
                 }
 
@@ -54,7 +54,7 @@ int main()
         usleep(CHECK_INTERVAL_MS * 1000);
     }
 
-    Buzzer_cleanup();
+    MotionBuzzer_cleanup();
     MotionSensor_cleanup();
 
     return 0;
