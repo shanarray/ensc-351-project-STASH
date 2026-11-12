@@ -39,7 +39,7 @@ int MotionBuzzer_init(void)
         }
         gpiod_chip_close(chip);
     }
-    fputs("GPIO7 not found; check gpioinfo and pin mux.\n", stderr);
+    fputs("GPIO12 not found; check gpioinfo and pin mux.\n", stderr);
     return -1;
 }
 
