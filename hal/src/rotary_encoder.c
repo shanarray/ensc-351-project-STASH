@@ -282,14 +282,25 @@ bool rotary_encoder_init(void)
 
     // Release temporary configuration objects.
     gpiod_line_settings_free(settings_a);
+    settings_a = NULL;
+   
     gpiod_line_settings_free(settings_b);
+    settings_b = NULL;
+    
     gpiod_line_settings_free(settings_sw);
+    settings_sw = NULL;
     
     gpiod_line_config_free(config_a);
+    config_a = NULL;
+    
     gpiod_line_config_free(config_b_sw);
+    config_b_sw = NULL;
 
     gpiod_request_config_free(request_config_a);
+    request_config_a = NULL;
+    
     gpiod_request_config_free(request_config_b_sw);
+    request_config_b_sw = NULL;
 
 
     pthread_mutex_lock(&encoder_mutex);
