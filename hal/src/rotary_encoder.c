@@ -71,7 +71,7 @@ static void *encoder_thread_func(void *arg)
         // Wait for a falling edge on encoder A.
         // The timeout also allows us to sample the button.
         int rec = gpiod_line_request_wait_edge_events(
-            request, POLL_TIMEOUT_NS
+            request_a, POLL_TIMEOUT_NS
         );
 
         if (rec < 0) {
@@ -277,7 +277,7 @@ bool rotary_encoder_init(void)
 
     if (event_buffer == NULL) {
         perror("RotaryEncoder: creating event buffer failed");
-        goto fail_config;
+        goto fail;
     }
 
     // Release temporary configuration objects.
