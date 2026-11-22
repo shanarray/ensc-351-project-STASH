@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>STASH | Smart Study Station</title>
+  <link rel="stylesheet" href="/stylesheets/style.css">
+</head>
+<body>
+  <main>
+    <header><div><div class="eyebrow">GROUP STASH</div><h1>Smart Study Station</h1><p>Live timer, motion monitoring and music status</p></div><div id="connection" class="connection">Connecting…</div></header>
+    <div class="grid">
+      <section class="card timer-card"><div class="eyebrow">CURRENT SESSION</div><div id="state" class="state">--</div><div id="timer" class="timer">--:--:--</div><p class="muted">Controlled by the physical buttons and joystick</p></section>
+      <section class="card environment"><h2>Hardware Status</h2><div class="metric"><span>Motion sensor</span><strong><span id="motion">--</span></strong></div><div class="metric"><span>Music volume</span><strong><span id="volume">--</span> <small>%</small></strong></div><p class="muted">Readings come from the integrated BeagleY-AI application.</p></section>
+      <section class="card history"><div class="history-heading"><h2>Session History</h2><span class="muted">Recent sessions</span></div><div class="table-wrap"><table><thead><tr><th>Date</th><th>Mode</th><th>Duration</th></tr></thead><tbody id="history"><tr><td colspan="3">No sessions logged yet.</td></tr></tbody></table></div></section>
+    </div>
+    <footer>Local dashboard • Data comes from the BeagleY-AI</footer>
+  </main>
+  <script src="/javascripts/study_station_ui.js"></script>
+</body>
+</html>

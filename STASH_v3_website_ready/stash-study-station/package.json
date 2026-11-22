@@ -1,0 +1,7 @@
+{
+  "name": "stash-study-station",
+  "version": "1.0.0",
+  "private": true,
+  "description": "STASH study station dashboard based on ENSC 351 Beat-Box website layout",
+  "scripts": {"start": "node server.js"}
+}
